@@ -1,0 +1,25 @@
+// Simple calculator example
+
+// Numbers to operate on
+let x = 10;
+let y = 5;
+
+// Addition
+let sum = x + y;
+print sum;
+
+// Subtraction
+let diff = x - y;
+print diff;
+
+// Multiplication
+let product = x * y;
+print product;
+
+// Division
+let quotient = x / y;
+print quotient;
+
+// More complex expression
+let result = (x + y) * (x - y);
+print result;

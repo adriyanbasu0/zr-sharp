@@ -1,0 +1,18 @@
+# Build artifacts
+compiler
+a.out
+*.o
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Test executables
+test
+example

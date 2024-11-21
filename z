@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# Function to print usage
+print_usage() {
+    echo "Usage: z <source_file> [-o output_name]"
+    echo "Options:"
+    echo "  -o    Specify output file name (default: a.out)"
+}
+
+# Get absolute path of script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Default output name
+output="a.out"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -o)
+            if [[ -z "$2" ]]; then
+                echo "Error: -o requires an output file name"
+                exit 1
+            fi
+            output="$2"
+            shift 2
+            ;;
+        -h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            if [[ -z "$source_file" ]]; then
+                source_file="$1"
+                shift
+            else
+                echo "Error: Too many arguments"
+                print_usage
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+# Check if source file is provided
+if [[ -z "$source_file" ]]; then
+    echo "Error: No source file provided"
+    print_usage
+    exit 1
+fi
+
+# Check if source file exists
+if [[ ! -f "$source_file" ]]; then
+    echo "Error: Source file '$source_file' not found"
+    exit 1
+fi
+
+# Check if source file has .zr extension
+if [[ ! "$source_file" =~ \.zr$ ]]; then
+    echo "Error: Source file must have .zr extension"
+    exit 1
+fi
+
+# Get absolute path of source file
+source_file_abs="$(cd "$(dirname "$source_file")" && pwd)/$(basename "$source_file")"
+
+# Create C wrapper code
+temp_c_file=$(mktemp).c
+cat > "$temp_c_file" << 'EOL'
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(int argc, char* argv[]) {
+    const char* compiler_dir = "COMPILER_DIR";
+    const char* source_file = "SOURCE_FILE";
+    char cmd[1024];
+    
+    snprintf(cmd, sizeof(cmd), "%s/compiler %s", compiler_dir, source_file);
+    
+    FILE* pipe = popen(cmd, "r");
+    if (!pipe) {
+        fprintf(stderr, "Error: Command execution failed\n");
+        return 1;
+    }
+    
+    char buffer[128];
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        printf("%s", buffer);
+        fflush(stdout);
+    }
+    
+    return pclose(pipe);
+}
+EOL
+
+# Replace placeholders with actual paths
+sed -i '' "s|COMPILER_DIR|${SCRIPT_DIR}|g" "$temp_c_file"
+sed -i '' "s|SOURCE_FILE|${source_file_abs}|g" "$temp_c_file"
+
+# Compile the compiler if needed
+if [[ ! -f "compiler" ]] || [[ "compiler" -ot "main.c" ]] || [[ "compiler" -ot "lexer.c" ]] || [[ "compiler" -ot "parser.c" ]] || [[ "compiler" -ot "interpreter.c" ]]; then
+    echo "Compiling ZR# compiler..."
+    gcc -o compiler main.c lexer.c parser.c interpreter.c -I.
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Failed to compile ZR# compiler"
+        rm "$temp_c_file"
+        exit 1
+    fi
+fi
+
+# Compile the wrapper code
+gcc -o "$output" "$temp_c_file"
+if [[ $? -ne 0 ]]; then
+    echo "Error: Failed to compile wrapper"
+    rm "$temp_c_file"
+    exit 1
+fi
+
+# Clean up
+rm "$temp_c_file"
+
+echo "Successfully compiled $source_file to $output"

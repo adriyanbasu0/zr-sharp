@@ -1,0 +1,23 @@
+// Variables and scoping example
+
+let x = 10;
+print x;
+
+// Block scope
+{
+    let y = 5;
+    print y;
+    
+    let x = 20;  // Shadows outer x
+    print x;
+};
+
+print x;  // Prints original x
+
+// Using variables in expressions
+let a = 1;
+let b = 2;
+let c = 3;
+
+let result = a + b * c;
+print result;
