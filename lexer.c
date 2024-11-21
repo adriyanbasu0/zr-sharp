@@ -1,206 +1,249 @@
 #include "compiler.h"
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 
-// Read the next character
-static void read_char(Lexer* lexer) {
-    if (lexer->read_position >= strlen(lexer->source)) {
-        lexer->current_char = '\0';
-    } else {
-        lexer->current_char = lexer->source[lexer->read_position];
-    }
-    
-    lexer->position = lexer->read_position;
-    lexer->read_position++;
-    
-    if (lexer->current_char == '\n') {
-        lexer->line++;
-        lexer->column = 0;
-    } else {
-        lexer->column++;
-    }
-}
+// Keywords table
+static struct {
+    const char* keyword;
+    TokenType type;
+} keywords[] = {
+    {"let", TOKEN_LET},
+    {"if", TOKEN_IF},
+    {"else", TOKEN_ELSE},
+    {"while", TOKEN_WHILE},
+    {"print", TOKEN_PRINT},
+    {"func", TOKEN_FUNC},
+    {"return", TOKEN_RETURN},
+    {"true", TOKEN_TRUE},
+    {"false", TOKEN_FALSE},
+    {"and", TOKEN_AND},
+    {"or", TOKEN_OR},
+    {"not", TOKEN_NOT},
+    {NULL, TOKEN_EOF}
+};
 
-Lexer* init_lexer(const char* source) {
-    Lexer* lexer = (Lexer*)malloc(sizeof(Lexer));
-    lexer->source = source;
+// Initialize lexer
+Lexer* init_lexer(char* input) {
+    Lexer* lexer = safe_malloc(sizeof(Lexer));
+    lexer->input = input;
     lexer->position = 0;
-    lexer->read_position = 0;
-    lexer->current_char = '\0';
     lexer->line = 1;
-    lexer->column = 0;
-    
-    // Read first character
-    read_char(lexer);
-    
+    lexer->column = 1;
     return lexer;
 }
 
 // Skip whitespace and comments
 static void skip_whitespace_and_comments(Lexer* lexer) {
-    while (1) {
-        // Skip whitespace
-        while (isspace(lexer->current_char)) {
-            read_char(lexer);
-        }
+    while (lexer->input[lexer->position] != '\0') {
+        char c = lexer->input[lexer->position];
         
-        // Skip single-line comments
-        if (lexer->current_char == '/' && lexer->source[lexer->read_position] == '/') {
-            while (lexer->current_char != '\n' && lexer->current_char != '\0') {
-                read_char(lexer);
+        if (isspace(c)) {
+            if (c == '\n') {
+                lexer->line++;
+                lexer->column = 1;
+            } else {
+                lexer->column++;
             }
-            continue;
+            lexer->position++;
         }
-        break;
+        // Skip single-line comments
+        else if (c == '/' && lexer->input[lexer->position + 1] == '/') {
+            while (lexer->input[lexer->position] != '\0' && 
+                   lexer->input[lexer->position] != '\n') {
+                lexer->position++;
+            }
+        }
+        else {
+            break;
+        }
     }
 }
 
-// Read an identifier
-static char* read_identifier(Lexer* lexer) {
-    int start_pos = lexer->position;
-    while (isalnum(lexer->current_char) || lexer->current_char == '_') {
-        read_char(lexer);
-    }
-    
-    int length = lexer->position - start_pos;
-    char* identifier = malloc(length + 1);
-    strncpy(identifier, &lexer->source[start_pos], length);
-    identifier[length] = '\0';
-    
-    return identifier;
-}
-
-// Read a number
-static char* read_number(Lexer* lexer) {
-    int start_pos = lexer->position;
-    while (isdigit(lexer->current_char) || lexer->current_char == '.') {
-        read_char(lexer);
-    }
-    
-    int length = lexer->position - start_pos;
-    char* number = malloc(length + 1);
-    strncpy(number, &lexer->source[start_pos], length);
-    number[length] = '\0';
-    
-    return number;
-}
-
-// Get token type for identifier
-static TokenType get_identifier_type(const char* identifier) {
-    if (strcmp(identifier, "let") == 0) return TOKEN_LET;
-    if (strcmp(identifier, "if") == 0) return TOKEN_IF;
-    if (strcmp(identifier, "else") == 0) return TOKEN_ELSE;
-    if (strcmp(identifier, "print") == 0) return TOKEN_PRINT;
-    return TOKEN_IDENTIFIER;
-}
-
-// Get the next token from the source code
-Token get_next_token(Lexer* lexer) {
+// Read identifier or keyword
+static Token read_identifier(Lexer* lexer) {
+    int start = lexer->position;
     Token token;
     token.line = lexer->line;
     token.column = lexer->column;
     
-    skip_whitespace_and_comments(lexer);
-    
-    switch (lexer->current_char) {
-        case '\0':
-            token.type = TOKEN_EOF;
-            token.value = NULL;
-            break;
-            
-        case '+':
-            token.type = TOKEN_PLUS;
-            token.value = strdup("+");
-            read_char(lexer);
-            break;
-            
-        case '-':
-            token.type = TOKEN_MINUS;
-            token.value = strdup("-");
-            read_char(lexer);
-            break;
-            
-        case '*':
-            token.type = TOKEN_MULTIPLY;
-            token.value = strdup("*");
-            read_char(lexer);
-            break;
-            
-        case '/':
-            token.type = TOKEN_DIVIDE;
-            token.value = strdup("/");
-            read_char(lexer);
-            break;
-            
-        case '=':
-            if (lexer->source[lexer->read_position] == '=') {
-                token.type = TOKEN_EQ;
-                token.value = strdup("==");
-                read_char(lexer);
-                read_char(lexer);
-            } else {
-                token.type = TOKEN_ASSIGN;
-                token.value = strdup("=");
-                read_char(lexer);
-            }
-            break;
-            
-        case '>':
-            token.type = TOKEN_GT;
-            token.value = strdup(">");
-            read_char(lexer);
-            break;
-            
-        case '<':
-            token.type = TOKEN_LT;
-            token.value = strdup("<");
-            read_char(lexer);
-            break;
-            
-        case '(':
-            token.type = TOKEN_LPAREN;
-            token.value = strdup("(");
-            read_char(lexer);
-            break;
-            
-        case ')':
-            token.type = TOKEN_RPAREN;
-            token.value = strdup(")");
-            read_char(lexer);
-            break;
-            
-        case '{':
-            token.type = TOKEN_LBRACE;
-            token.value = strdup("{");
-            read_char(lexer);
-            break;
-            
-        case '}':
-            token.type = TOKEN_RBRACE;
-            token.value = strdup("}");
-            read_char(lexer);
-            break;
-            
-        case ';':
-            token.type = TOKEN_SEMICOLON;
-            token.value = strdup(";");
-            read_char(lexer);
-            break;
-            
-        default:
-            if (isalpha(lexer->current_char) || lexer->current_char == '_') {
-                token.value = read_identifier(lexer);
-                token.type = get_identifier_type(token.value);
-            } else if (isdigit(lexer->current_char)) {
-                token.value = read_number(lexer);
-                token.type = TOKEN_NUMBER;
-            } else {
-                token.type = TOKEN_EOF;
-                token.value = NULL;
-                read_char(lexer);
-            }
-            break;
+    while (isalnum(lexer->input[lexer->position]) || 
+           lexer->input[lexer->position] == '_') {
+        lexer->position++;
+        lexer->column++;
     }
     
+    int length = lexer->position - start;
+    char* value = safe_malloc(length + 1);
+    strncpy(value, &lexer->input[start], length);
+    value[length] = '\0';
+    
+    // Check if it's a keyword
+    for (int i = 0; keywords[i].keyword != NULL; i++) {
+        if (strcmp(value, keywords[i].keyword) == 0) {
+            token.type = keywords[i].type;
+            token.text = value;
+            return token;
+        }
+    }
+    
+    token.type = TOKEN_IDENT;
+    token.text = value;
     return token;
+}
+
+// Read number (integer or float)
+static Token read_number(Lexer* lexer) {
+    Token token;
+    token.type = TOKEN_NUMBER;
+    token.line = lexer->line;
+    token.column = lexer->column;
+    
+    int start = lexer->position;
+    bool has_dot = false;
+    
+    while (isdigit(lexer->input[lexer->position]) || 
+           (!has_dot && lexer->input[lexer->position] == '.')) {
+        if (lexer->input[lexer->position] == '.') {
+            has_dot = true;
+        }
+        lexer->position++;
+        lexer->column++;
+    }
+    
+    int length = lexer->position - start;
+    char* value = safe_malloc(length + 1);
+    strncpy(value, &lexer->input[start], length);
+    value[length] = '\0';
+    
+    token.text = value;
+    return token;
+}
+
+// Read string literal
+static Token read_string(Lexer* lexer) {
+    Token token;
+    token.type = TOKEN_STRING;
+    token.line = lexer->line;
+    token.column = lexer->column;
+    
+    lexer->position++; // Skip opening quote
+    int start = lexer->position;
+    
+    while (lexer->input[lexer->position] != '"' && 
+           lexer->input[lexer->position] != '\0') {
+        if (lexer->input[lexer->position] == '\n') {
+            error("Unterminated string literal at line %d", lexer->line);
+        }
+        lexer->position++;
+        lexer->column++;
+    }
+    
+    if (lexer->input[lexer->position] == '\0') {
+        error("Unterminated string literal at line %d", lexer->line);
+    }
+    
+    int length = lexer->position - start;
+    char* value = safe_malloc(length + 1);
+    strncpy(value, &lexer->input[start], length);
+    value[length] = '\0';
+    
+    lexer->position++; // Skip closing quote
+    lexer->column++;
+    
+    token.text = value;
+    return token;
+}
+
+// Get next token
+Token get_next_token(Lexer* lexer) {
+    skip_whitespace_and_comments(lexer);
+    
+    Token token;
+    token.line = lexer->line;
+    token.column = lexer->column;
+    
+    if (lexer->input[lexer->position] == '\0') {
+        token.type = TOKEN_EOF;
+        token.text = NULL;
+        return token;
+    }
+    
+    char c = lexer->input[lexer->position];
+    
+    if (isalpha(c) || c == '_') {
+        return read_identifier(lexer);
+    }
+    
+    if (isdigit(c)) {
+        return read_number(lexer);
+    }
+    
+    if (c == '"') {
+        return read_string(lexer);
+    }
+    
+    lexer->position++;
+    lexer->column++;
+    
+    switch (c) {
+        case '+': token.type = TOKEN_PLUS; break;
+        case '-': token.type = TOKEN_MINUS; break;
+        case '*': token.type = TOKEN_STAR; break;
+        case '/': token.type = TOKEN_SLASH; break;
+        case '(': token.type = TOKEN_LPAREN; break;
+        case ')': token.type = TOKEN_RPAREN; break;
+        case '{': token.type = TOKEN_LBRACE; break;
+        case '}': token.type = TOKEN_RBRACE; break;
+        case ';': token.type = TOKEN_SEMICOLON; break;
+        case ',': token.type = TOKEN_COMMA; break;
+        case '=':
+            if (lexer->input[lexer->position] == '=') {
+                token.type = TOKEN_EQEQ;
+                lexer->position++;
+                lexer->column++;
+            } else {
+                token.type = TOKEN_EQ;
+            }
+            break;
+        case '<':
+            if (lexer->input[lexer->position] == '=') {
+                token.type = TOKEN_LTEQ;
+                lexer->position++;
+                lexer->column++;
+            } else {
+                token.type = TOKEN_LT;
+            }
+            break;
+        case '>':
+            if (lexer->input[lexer->position] == '=') {
+                token.type = TOKEN_GTEQ;
+                lexer->position++;
+                lexer->column++;
+            } else {
+                token.type = TOKEN_GT;
+            }
+            break;
+        case '!':
+            if (lexer->input[lexer->position] == '=') {
+                token.type = TOKEN_NOTEQ;
+                lexer->position++;
+                lexer->column++;
+            } else {
+                token.type = TOKEN_NOT;
+            }
+            break;
+        default:
+            error("Invalid character '%c' at line %d, column %d", 
+                  c, token.line, token.column);
+            token.type = TOKEN_EOF;
+    }
+    
+    token.text = NULL;
+    return token;
+}
+
+// Free lexer resources
+void free_lexer(Lexer* lexer) {
+    safe_free(lexer);
 }
