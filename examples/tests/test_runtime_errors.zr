@@ -1,0 +1,4 @@
+print 1 / 0;
+print unknown_var;
+let x = 10;
+print x;

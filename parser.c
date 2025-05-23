@@ -9,7 +9,7 @@ static void advance_token(Parser* parser) {
 
 // Initialize parser with a lexer
 Parser* init_parser(Lexer* lexer) {
-    Parser* parser = (Parser*)malloc(sizeof(Parser));
+    Parser* parser = (Parser*)safe_malloc(sizeof(Parser)); // Use safe_malloc
     parser->lexer = lexer;
     advance_token(parser);  // Load first token
     return parser;
@@ -17,23 +17,41 @@ Parser* init_parser(Lexer* lexer) {
 
 // Create a new AST node
 static ASTNode* create_node(NodeType type) {
-    ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
-    if (node == NULL) return NULL;
+    ASTNode* node = (ASTNode*)safe_malloc(sizeof(ASTNode)); // Use safe_malloc
+    // safe_malloc handles exit on failure, so no NULL check needed here for node itself
     
     node->type = type;
-    node->value = NULL;
+    // Initialize Value union members
+    node->value.string_val = NULL; 
+    node->value.int_val = 0;
+    node->value.float_val = 0.0;
+    node->value.bool_val = false;
+    // Initialize other ASTNode members
     node->left = NULL;
     node->right = NULL;
+    node->condition = NULL; // Added for completeness, as per compiler.h
+    node->body = NULL;      // Added for completeness
+    node->else_body = NULL; // Added for completeness
+    node->params = NULL;    // Added for completeness
+    node->param_count = 0;  // Added for completeness
     node->statements = NULL;
-    node->statements_count = 0;
+    node->statement_count = 0; // Renamed from statements_count for consistency with compiler.h
+    node->data_type = TYPE_VOID; // Default data type
     
     return node;
 }
 
 // Parse an identifier
 static ASTNode* parse_identifier(Parser* parser) {
-    ASTNode* node = create_node(NODE_IDENTIFIER);
-    node->value = strdup(parser->current_token.value);
+    ASTNode* node = create_node(NODE_IDENT); 
+    if (!node) return NULL;
+    if (parser->current_token.text == NULL) { // Should not happen for IDENT if lexer is correct
+        fprintf(stderr, "Parser Error: Identifier token has NULL text.\n");
+        safe_free(node);
+        return NULL;
+    }
+    node->value.string_val = parser->current_token.text; // Transfer ownership
+    parser->current_token.text = NULL;                  // Nullify original pointer
     advance_token(parser);
     return node;
 }
@@ -41,7 +59,14 @@ static ASTNode* parse_identifier(Parser* parser) {
 // Parse a number
 static ASTNode* parse_number(Parser* parser) {
     ASTNode* node = create_node(NODE_NUMBER);
-    node->value = strdup(parser->current_token.value);
+    if (!node) return NULL;
+    if (parser->current_token.text == NULL) { // Should not happen for NUMBER if lexer is correct
+        fprintf(stderr, "Parser Error: Number token has NULL text.\n");
+        safe_free(node);
+        return NULL;
+    }
+    node->value.string_val = parser->current_token.text; // Transfer ownership
+    parser->current_token.text = NULL;                  // Nullify original pointer
     advance_token(parser);
     return node;
 }
@@ -51,48 +76,121 @@ static ASTNode* parse_expression(Parser* parser);
 static ASTNode* parse_statement(Parser* parser);
 static ASTNode* parse_block(Parser* parser);
 
-// Parse a binary operation
-static ASTNode* parse_binary_operation(Parser* parser, ASTNode* left) {
-    ASTNode* node = create_node(NODE_BINARY_OP);
-    node->value = strdup(parser->current_token.value);
-    node->left = left;
-    
-    advance_token(parser);
-    node->right = parse_expression(parser);
-    
-    return node;
-}
+// parse_binary_operation is removed as it's unused. 
+// Logic is handled in parse_expression.
 
 // Parse an expression
 static ASTNode* parse_expression(Parser* parser) {
-    ASTNode* left;
+    ASTNode* left = NULL; // Initialize left to NULL
     
+    // Parse primary expressions like identifiers, numbers, literals, parenthesized expressions
     switch (parser->current_token.type) {
-        case TOKEN_IDENTIFIER:
+        case TOKEN_IDENT:
             left = parse_identifier(parser);
             break;
         case TOKEN_NUMBER:
             left = parse_number(parser);
             break;
+        case TOKEN_STRING: {
+            ASTNode* node = create_node(NODE_STRING);
+            if (parser->current_token.text == NULL) { // Should not happen for STRING if lexer is correct
+                fprintf(stderr, "Parser Error: String token has NULL text.\n");
+                safe_free(node);
+                left = NULL;
+            } else {
+                node->value.string_val = parser->current_token.text; // Transfer ownership
+                parser->current_token.text = NULL;                  // Nullify original pointer
+                node->data_type = TYPE_STRING; 
+                left = node; 
+            }
+            advance_token(parser); // Consume TOKEN_STRING
+            break;
+        }
+        case TOKEN_TRUE:
+        case TOKEN_FALSE: {
+            ASTNode* node = create_node(NODE_BOOL);
+            node->value.bool_val = (parser->current_token.type == TOKEN_TRUE);
+            node->data_type = TYPE_BOOL;
+            advance_token(parser); // Consume the token
+            left = node;
+            break;
+        }
+        case TOKEN_LPAREN: {
+            advance_token(parser); // Consume TOKEN_LPAREN
+            ASTNode* inner_expression = parse_expression(parser);
+            if (inner_expression == NULL || parser->current_token.type != TOKEN_RPAREN) {
+                fprintf(stderr, "Parser Error: Mismatched parentheses or invalid expression within parentheses.\n");
+                if (inner_expression) free_ast(inner_expression);
+                left = NULL; 
+            } else {
+                advance_token(parser); // Consume TOKEN_RPAREN
+                left = inner_expression;
+            }
+            break;
+        }
         default:
-            return NULL;
+            // If the token cannot start an expression, print an error and return NULL.
+            // This prevents falling through to the binary operator loop with a NULL left operand
+            // if the token is not a binary operator either.
+            fprintf(stderr, "Parser Error: Token '%s' cannot start an expression.\n", parser->current_token.text);
+            return NULL; // Return NULL directly
     }
     
+    // If left is NULL after trying to parse a primary expression (e.g. strdup failed, or error in LPAREN),
+    // and it wasn't an explicit "cannot start expression" error from default, then return NULL.
+    if (left == NULL) {
+        // This path might be taken if, for example, strdup failed for TOKEN_STRING
+        // or if LPAREN parsing had an error that set left to NULL.
+        // The specific error message would have been printed in the case.
+        return NULL;
+    }
+
+    // Parse binary operations
     while (parser->current_token.type == TOKEN_PLUS ||
            parser->current_token.type == TOKEN_MINUS ||
-           parser->current_token.type == TOKEN_MULTIPLY ||
-           parser->current_token.type == TOKEN_DIVIDE ||
+           parser->current_token.type == TOKEN_STAR ||   // Requirement 3
+           parser->current_token.type == TOKEN_SLASH ||  // Requirement 3
            parser->current_token.type == TOKEN_GT ||
            parser->current_token.type == TOKEN_LT ||
-           parser->current_token.type == TOKEN_EQ) {
-        ASTNode* node = create_node(NODE_BINARY_OP);
-        node->value = strdup(parser->current_token.value);
+           parser->current_token.type == TOKEN_EQ ||     // This TOKEN_EQ is for assignment in some contexts, but here it's for comparison if it's part of general expression parsing. Let's assume it's general for now.
+           parser->current_token.type == TOKEN_EQEQ ||   // Requirement 4
+           parser->current_token.type == TOKEN_LTEQ ||   // Requirement 4
+           parser->current_token.type == TOKEN_GTEQ ||   // Requirement 4
+           parser->current_token.type == TOKEN_NOTEQ ||  // Requirement 4
+           parser->current_token.type == TOKEN_AND ||    // Requirement 4
+           parser->current_token.type == TOKEN_OR) {     // Requirement 4
+        ASTNode* node = create_node(NODE_BINARY); // Requirement 1
+        if (!node) { if (left) free_ast(left); return NULL; } // Clean up left if node creation fails
+        
+        // Store operator token text
+        if (parser->current_token.text == NULL) { // Should not happen for operator tokens
+             fprintf(stderr, "Parser Error: Operator token has NULL text.\n");
+             free_ast(left); // Free the left operand
+             safe_free(node); // Free the partially created binary node
+             return NULL;    // Critical error
+        }
+        node->value.string_val = parser->current_token.text; // Transfer ownership
+        parser->current_token.text = NULL;                  // Nullify original pointer
         node->left = left;
         
-        advance_token(parser);
-        node->right = parse_expression(parser);
+        // Store operator type as node's data_type or a specific field if added
+        // For now, the type of binary operation is implicitly known by parser logic
+        // or could be stored in node->data_type if appropriate
+        // node->data_type = operator_token_to_type(parser->current_token.type);
+
+        advance_token(parser); // Consume operator
         
-        left = node;
+        // This recursive call to parse_expression might need precedence handling for correctness
+        // For now, it implements left-associativity for operators of same precedence.
+        ASTNode* right_operand = parse_expression(parser); 
+        if (!right_operand) {
+            // If right operand parsing fails, free the operator node and its left child
+            free_ast(node); // This should free node->value.string_val and node->left (which is 'left')
+            return NULL;
+        }
+        node->right = right_operand;
+        
+        left = node; // Current binary operation becomes the left operand for the next
     }
     
     return left;
@@ -102,28 +200,39 @@ static ASTNode* parse_expression(Parser* parser) {
 static ASTNode* parse_let_statement(Parser* parser) {
     advance_token(parser);  // consume 'let'
     
-    if (parser->current_token.type != TOKEN_IDENTIFIER) {
+    if (parser->current_token.type != TOKEN_IDENT) { // Requirement 3
+        // error("Expected identifier after 'let'");
         return NULL;
     }
     
-    char* name = strdup(parser->current_token.value);
+    // Directly create the node and store the identifier in it
+    ASTNode* node = create_node(NODE_LET); // Requirement 1
+    if (!node) return NULL;
+
+    // Assuming current_token.text is the correct field from lexer
+    node->value.string_val = strdup(parser->current_token.text); // Requirement 2 & 5 (direct assignment)
+    if (!node->value.string_val) { free_ast(node); return NULL; } // Check strdup success
+
     advance_token(parser);  // consume identifier
     
-    if (parser->current_token.type != TOKEN_ASSIGN) {
-        free(name);
+    if (parser->current_token.type != TOKEN_EQ) { // Requirement 3 (TOKEN_ASSIGN -> TOKEN_EQ)
+        // error("Expected '=' after identifier in let statement");
+        free_ast(node); // Free the partially created node
         return NULL;
     }
     advance_token(parser);  // consume '='
     
-    ASTNode* value = parse_expression(parser);
-    if (value == NULL) {
-        free(name);
+    ASTNode* value_expr = parse_expression(parser);
+    if (value_expr == NULL) {
+        // error("Expected expression after '=' in let statement");
+        free_ast(node); // Free the partially created node (name is in node->value.string_val)
         return NULL;
     }
     
-    ASTNode* node = create_node(NODE_STATEMENT);
-    node->value = name;
-    node->left = value;
+    // The 'name' is node->value.string_val. The 'value_expr' is the expression.
+    // For NODE_LET, 'left' can be used for the expression.
+    node->left = value_expr; 
+    // No 'right' child for NODE_LET in this structure, 'value' holds the var name.
     
     return node;
 }
@@ -142,19 +251,43 @@ static ASTNode* parse_print_statement(Parser* parser) {
 static ASTNode* parse_block(Parser* parser) {
     advance_token(parser);  // consume '{'
     
-    ASTNode* block = create_node(NODE_PROGRAM);
-    block->statements = malloc(sizeof(ASTNode*) * MAX_STATEMENTS);
-    
+    ASTNode* block_node = create_node(NODE_BLOCK); // Requirement 1
+    // if (!block_node) return NULL; // create_node uses safe_malloc
+
+    // Allocate statements array for the block node
+    block_node->statements = safe_malloc(sizeof(ASTNode*) * MAX_STATEMENTS);
+
+    // Use statement_count (updated in create_node)
     while (parser->current_token.type != TOKEN_RBRACE && 
            parser->current_token.type != TOKEN_EOF) {
         ASTNode* statement = parse_statement(parser);
         if (statement != NULL) {
-            block->statements[block->statements_count++] = statement;
+            // TODO: Implement dynamic array for statements if MAX_STATEMENTS is not desired
+            if (block_node->statement_count < MAX_STATEMENTS) {
+                 block_node->statements[block_node->statement_count++] = statement;
+            } else {
+                // error("Exceeded maximum number of statements in a block.");
+                free_ast(statement); // Free the statement that couldn't be added
+                // Potentially free all previously added statements and the block node itself
+                // For now, just stop adding and report error or handle gracefully
+                break; 
+            }
+        } else {
+            // If parse_statement returns NULL, it might mean an error or just end of a construct
+            // Depending on error recovery strategy, might need to break or skip token
+            // For now, assume error and break.
+            // error("Invalid statement in block.");
+            break;
         }
     }
     
+    if (parser->current_token.type != TOKEN_RBRACE) {
+        // error("Expected '}' to close block");
+        free_ast(block_node); // Free the partially formed block
+        return NULL;
+    }
     advance_token(parser);  // consume '}'
-    return block;
+    return block_node;
 }
 
 // Parse an if statement
@@ -182,9 +315,9 @@ static ASTNode* parse_if_statement(Parser* parser) {
     }
     
     ASTNode* node = create_node(NODE_IF);
-    node->left = condition;
-    node->right = if_block;
-    node->else_block = else_block;
+    node->condition = condition; // Use condition field for if condition
+    node->body = if_block;       // Use body field for if block
+    node->else_body = else_block; // Corrected from else_block
     
     return node;
 }
@@ -194,21 +327,29 @@ static ASTNode* parse_statement(Parser* parser) {
     ASTNode* statement = NULL;
     
     switch (parser->current_token.type) {
-        case TOKEN_LET:
+        case TOKEN_LET: // Stays TOKEN_LET, was already correct
             statement = parse_let_statement(parser);
             break;
-        case TOKEN_IF:
+        case TOKEN_IF: // Stays TOKEN_IF
             statement = parse_if_statement(parser);
             break;
-        case TOKEN_PRINT:
+        case TOKEN_PRINT: // Stays TOKEN_PRINT
             statement = parse_print_statement(parser);
             break;
+        // Add other statement types: TOKEN_WHILE, TOKEN_FUNC, TOKEN_RETURN etc.
         default:
+            // If it's not a recognized statement keyword, try parsing it as an expression statement
             statement = parse_expression(parser);
+            // Expression statements must be followed by a semicolon (usually)
+            if (statement && parser->current_token.type != TOKEN_SEMICOLON) {
+                // error("Expression statement must be followed by a semicolon.");
+                // free_ast(statement); // Free the parsed expression
+                // return NULL; // Or attempt recovery
+            }
             break;
     }
     
-    // Consume semicolon if present
+    // Consume semicolon if present, and it's expected for the statement type
     if (parser->current_token.type == TOKEN_SEMICOLON) {
         advance_token(parser);
     }
@@ -218,15 +359,94 @@ static ASTNode* parse_statement(Parser* parser) {
 
 // Parse a program (entry point)
 ASTNode* parse_program(Parser* parser) {
-    ASTNode* program = create_node(NODE_PROGRAM);
-    program->statements = malloc(sizeof(ASTNode*) * MAX_STATEMENTS);
-    
+    // A program is parsed as a top-level block
+    ASTNode* program_node = create_node(NODE_BLOCK); // Changed NODE_PROGRAM to NODE_BLOCK
+    // if (!program_node) return NULL; // create_node uses safe_malloc
+
+    // Allocate statements array for the program node
+    program_node->statements = safe_malloc(sizeof(ASTNode*) * MAX_STATEMENTS);
+    // if (!program_node->statements) { free_ast(program_node); return NULL; } // safe_malloc handles exit
+
     while (parser->current_token.type != TOKEN_EOF) {
         ASTNode* statement = parse_statement(parser);
         if (statement != NULL) {
-            program->statements[program->statements_count++] = statement;
+             if (program_node->statement_count < MAX_STATEMENTS) {
+                program_node->statements[program_node->statement_count++] = statement;
+            } else {
+                // error("Exceeded maximum number of statements in program.");
+                free_ast(statement);
+                break;
+            }
+        } else {
+            // error("Invalid statement in program.");
+            // Attempt to recover by skipping token or stop parsing
+            // For now, stop if a statement parsing fails.
+            break; 
         }
     }
     
-    return program;
+    return program_node;
+}
+
+// In parser.c
+void free_ast(ASTNode* node) {
+    if (node == NULL) {
+        return;
+    }
+
+    // Corrected conditional free:
+    if ((node->type == NODE_IDENT ||
+         node->type == NODE_NUMBER ||
+         node->type == NODE_STRING ||
+         node->type == NODE_BINARY ||
+         node->type == NODE_LET) && /* NODE_LET's value.string_val is var name */
+        node->value.string_val != NULL) {
+        safe_free(node->value.string_val);
+        node->value.string_val = NULL;
+    }
+    // For other node types like NODE_BOOL, NODE_PRINT, NODE_IF, NODE_BLOCK, etc.,
+    // value.string_val is not used for dynamically allocated strings that free_ast should free.
+
+    // Recursively free children nodes
+    free_ast(node->left);
+    free_ast(node->right);
+    free_ast(node->condition);
+    free_ast(node->body);
+    free_ast(node->else_body);
+
+    // Free parameters if any (for function nodes, not fully implemented yet)
+    if (node->params != NULL) {
+        for (int i = 0; i < node->param_count; i++) {
+            free_ast(node->params[i]);
+        }
+        safe_free(node->params);
+        node->params = NULL;
+    }
+
+    // Free statements if it's a block-like node
+    if (node->statements != NULL) {
+        for (int i = 0; i < node->statement_count; i++) {
+            free_ast(node->statements[i]);
+        }
+        safe_free(node->statements);
+        node->statements = NULL;
+    }
+
+    // Finally, free the node itself
+    safe_free(node);
+}
+
+// Free parser resources
+void free_parser(Parser* parser) {
+    // Note: parser->lexer is managed (created and freed) externally.
+    // We only free the Parser struct itself.
+    if (parser != NULL) {
+        // If parser owns lexer, free lexer here.
+        // For now, assuming lexer is freed separately or by main.
+        // if (parser->lexer) {
+        //     free_lexer(parser->lexer); // Example if parser owns lexer
+        //     parser->lexer = NULL;
+        // }
+        safe_free(parser);
+    }
 }

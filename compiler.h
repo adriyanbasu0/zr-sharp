@@ -112,7 +112,6 @@ typedef struct ASTNode {
     NodeType type;
     DataType data_type;
     Value value;
-    char* text;
     struct ASTNode* left;
     struct ASTNode* right;
     struct ASTNode* condition;
@@ -120,6 +119,8 @@ typedef struct ASTNode {
     struct ASTNode* else_body;
     struct ASTNode** params;
     int param_count;
+    struct ASTNode** statements;
+    int statement_count;
 } ASTNode;
 
 // Function structure
@@ -155,8 +156,10 @@ typedef struct {
 // Function declarations
 Lexer* init_lexer(char* input);
 Token get_next_token(Lexer* lexer);
+void free_lexer(Lexer* lexer); // Added declaration
 Parser* init_parser(Lexer* lexer);
 ASTNode* parse_program(Parser* parser);
+void free_parser(Parser* parser); // Added declaration
 void interpret(ASTNode* node);
 void free_ast(ASTNode* node);
 
@@ -171,5 +174,8 @@ bool is_compatible_type(DataType left, DataType right);
 // Memory management
 void* safe_malloc(size_t size);
 void safe_free(void* ptr);
+
+// Interpreter memory cleanup
+void free_interpreter_memory(void);
 
 #endif // COMPILER_H

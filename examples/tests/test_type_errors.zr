@@ -1,0 +1,6 @@
+print 1 + "hello";
+print true - 5;
+print false * 2;
+print 10 / true;
+// print "a" > "b"; // String comparison not implemented yet beyond basic type check
+print true && 1;
