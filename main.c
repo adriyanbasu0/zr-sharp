@@ -2,32 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Read the entire contents of a file
-char* read_file(const char* filename) {
-    FILE* file = fopen(filename, "r");
-    if (file == NULL) {
-        printf("Error: Could not open file %s\n", filename);
-        return NULL;
-    }
-    
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
-    char* buffer = (char*)malloc(length + 1);
-    if (buffer == NULL) {
-        printf("Error: Could not allocate memory for file contents\n");
-        fclose(file);
-        return NULL;
-    }
-    
-    size_t read = fread(buffer, 1, length, file);
-    buffer[read] = '\0';
-    
-    fclose(file);
-    return buffer;
-}
-
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <source_file>\n", argv[0]);
@@ -47,12 +21,8 @@ int main(int argc, char* argv[]) {
     fseek(file, 0, SEEK_SET);
     
     // Read file content
-    char* source = malloc(size + 1);
-    if (source == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed\n");
-        fclose(file);
-        return 1;
-    }
+    char* source = safe_malloc(size + 1); // Use safe_malloc
+    // safe_malloc handles exit on failure, so no NULL check needed here
     
     size_t read_size = fread(source, 1, size, file);
     source[read_size] = '\0';
@@ -66,13 +36,22 @@ int main(int argc, char* argv[]) {
     ASTNode* program = parse_program(parser);
     if (program != NULL) {
         interpret(program);
+        // Main success path cleanup:
+        free_ast(program);           // 1. Free AST // Restored
+        free_interpreter_memory();   // 2. Free interpreter memory
+        if (parser) free_parser(parser); // 3. Free parser
+        if (lexer) free_lexer(lexer);   // 4. Free lexer
+        safe_free(source);                // 5. Free source code string with safe_free
     } else {
         fprintf(stderr, "Error: Failed to parse program\n");
+        // Error path cleanup (program is NULL):
+        if (parser) free_parser(parser); // 1. Free parser
+        if (lexer) free_lexer(lexer);   // 2. Free lexer
+        safe_free(source);                // 3. Free source code string with safe_free
         return 1;
     }
     
-    // Clean up
-    free(source);
-    
+    // Normal exit, all resources should have been freed in the if (program != NULL) block.
+    // No duplicate free calls here.
     return 0;
 }

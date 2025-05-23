@@ -133,14 +133,22 @@ static Token read_string(Lexer* lexer) {
     while (lexer->input[lexer->position] != '"' && 
            lexer->input[lexer->position] != '\0') {
         if (lexer->input[lexer->position] == '\n') {
-            error("Unterminated string literal at line %d", lexer->line);
+            // Unterminated string literal due to newline
+            token.type = TOKEN_EOF;
+            token.text = "Unterminated string literal"; // Static string
+            // lexer->position and lexer->column remain at the newline character
+            return token;
         }
         lexer->position++;
         lexer->column++;
     }
     
     if (lexer->input[lexer->position] == '\0') {
-        error("Unterminated string literal at line %d", lexer->line);
+        // Unterminated string literal due to EOF
+        token.type = TOKEN_EOF;
+        token.text = "Unterminated string literal"; // Static string
+        // lexer->position and lexer->column remain at the EOF
+        return token;
     }
     
     int length = lexer->position - start;
@@ -183,67 +191,162 @@ Token get_next_token(Lexer* lexer) {
         return read_string(lexer);
     }
     
-    lexer->position++;
-    lexer->column++;
+    // For single and double character tokens, we'll set their text representation
+    // The general path is to advance position and column, then set type and text.
     
+    char next_char = lexer->input[lexer->position + 1]; // Peek ahead
+
     switch (c) {
-        case '+': token.type = TOKEN_PLUS; break;
-        case '-': token.type = TOKEN_MINUS; break;
-        case '*': token.type = TOKEN_STAR; break;
-        case '/': token.type = TOKEN_SLASH; break;
-        case '(': token.type = TOKEN_LPAREN; break;
-        case ')': token.type = TOKEN_RPAREN; break;
-        case '{': token.type = TOKEN_LBRACE; break;
-        case '}': token.type = TOKEN_RBRACE; break;
-        case ';': token.type = TOKEN_SEMICOLON; break;
-        case ',': token.type = TOKEN_COMMA; break;
+        case '+': 
+            token.type = TOKEN_PLUS; 
+            token.text = strdup("+"); 
+            lexer->position++; lexer->column++;
+            break;
+        case '-': 
+            token.type = TOKEN_MINUS; 
+            token.text = strdup("-"); 
+            lexer->position++; lexer->column++;
+            break;
+        case '*': 
+            token.type = TOKEN_STAR; 
+            token.text = strdup("*"); 
+            lexer->position++; lexer->column++;
+            break;
+        case '/': 
+            token.type = TOKEN_SLASH; 
+            token.text = strdup("/"); 
+            lexer->position++; lexer->column++;
+            break;
+        case '(': 
+            token.type = TOKEN_LPAREN; 
+            token.text = strdup("("); 
+            lexer->position++; lexer->column++;
+            break;
+        case ')': 
+            token.type = TOKEN_RPAREN; 
+            token.text = strdup(")"); 
+            lexer->position++; lexer->column++;
+            break;
+        case '{': 
+            token.type = TOKEN_LBRACE; 
+            token.text = strdup("{"); 
+            lexer->position++; lexer->column++;
+            break;
+        case '}': 
+            token.type = TOKEN_RBRACE; 
+            token.text = strdup("}"); 
+            lexer->position++; lexer->column++;
+            break;
+        case ';': 
+            token.type = TOKEN_SEMICOLON; 
+            token.text = strdup(";"); 
+            lexer->position++; lexer->column++;
+            break;
+        case ',': 
+            token.type = TOKEN_COMMA; 
+            token.text = strdup(","); 
+            lexer->position++; lexer->column++;
+            break;
         case '=':
-            if (lexer->input[lexer->position] == '=') {
+            if (next_char == '=') {
                 token.type = TOKEN_EQEQ;
-                lexer->position++;
-                lexer->column++;
+                token.text = strdup("==");
+                lexer->position += 2; lexer->column += 2;
             } else {
                 token.type = TOKEN_EQ;
+                token.text = strdup("=");
+                lexer->position++; lexer->column++;
             }
             break;
         case '<':
-            if (lexer->input[lexer->position] == '=') {
+            if (next_char == '=') {
                 token.type = TOKEN_LTEQ;
-                lexer->position++;
-                lexer->column++;
+                token.text = strdup("<=");
+                lexer->position += 2; lexer->column += 2;
             } else {
                 token.type = TOKEN_LT;
+                token.text = strdup("<");
+                lexer->position++; lexer->column++;
             }
             break;
         case '>':
-            if (lexer->input[lexer->position] == '=') {
+            if (next_char == '=') {
                 token.type = TOKEN_GTEQ;
-                lexer->position++;
-                lexer->column++;
+                token.text = strdup(">=");
+                lexer->position += 2; lexer->column += 2;
             } else {
                 token.type = TOKEN_GT;
+                token.text = strdup(">");
+                lexer->position++; lexer->column++;
             }
             break;
         case '!':
-            if (lexer->input[lexer->position] == '=') {
+            if (next_char == '=') {
                 token.type = TOKEN_NOTEQ;
-                lexer->position++;
-                lexer->column++;
+                token.text = strdup("!=");
+                lexer->position += 2; lexer->column += 2;
             } else {
+                // Assuming '!' is TOKEN_NOT as per original logic for single '!'
                 token.type = TOKEN_NOT;
+                token.text = strdup("!");
+                lexer->position++; lexer->column++;
+            }
+            break;
+        case '&':
+            if (next_char == '&') {
+                token.type = TOKEN_AND; // Assuming && maps to TOKEN_AND
+                token.text = strdup("&&");
+                lexer->position += 2; lexer->column += 2;
+            } else {
+                error("Invalid character '&' at line %d, column %d. Did you mean '&&'?", 
+                      token.line, token.column);
+                token.type = TOKEN_EOF;
+                token.text = NULL;
+                lexer->position++; lexer->column++; // Consume the invalid char
+            }
+            break;
+        case '|':
+            if (next_char == '|') {
+                token.type = TOKEN_OR; // Assuming || maps to TOKEN_OR
+                token.text = strdup("||");
+                lexer->position += 2; lexer->column += 2;
+            } else {
+                error("Invalid character '|' at line %d, column %d. Did you mean '||'?", 
+                      token.line, token.column);
+                token.type = TOKEN_EOF;
+                token.text = NULL;
+                lexer->position++; lexer->column++; // Consume the invalid char
             }
             break;
         default:
             error("Invalid character '%c' at line %d, column %d", 
                   c, token.line, token.column);
-            token.type = TOKEN_EOF;
+            token.type = TOKEN_EOF; // Or some error token type
+            token.text = NULL; // No text for invalid char
+            lexer->position++; lexer->column++; // Consume the invalid char
     }
     
-    token.text = NULL;
     return token;
 }
 
 // Free lexer resources
 void free_lexer(Lexer* lexer) {
-    safe_free(lexer);
+    safe_free(lexer); // Assumes safe_free handles NULL
+}
+
+// Implementation of safe_malloc
+void* safe_malloc(size_t size) {
+    void* ptr = malloc(size);
+    if (ptr == NULL) {
+        fprintf(stderr, "Fatal: Memory allocation failed (size: %zu).\n", size);
+        exit(EXIT_FAILURE);
+    }
+    return ptr;
+}
+
+// Implementation of safe_free
+void safe_free(void* ptr) {
+    if (ptr != NULL) {
+        free(ptr);
+    }
 }
