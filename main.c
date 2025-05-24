@@ -1,6 +1,18 @@
 #include "compiler.h"
+#include <stdarg.h> // For va_list, va_start, va_end
 #include <stdio.h>
 #include <stdlib.h>
+
+// Function to report errors and exit
+void error(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    fprintf(stderr, "Error: "); // Prefix with "Error: "
+    vfprintf(stderr, format, args);
+    fprintf(stderr, "\n"); // Add a newline for better formatting
+    va_end(args);
+    exit(1);
+}
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
