@@ -1,0 +1,91 @@
+// Test cases for explicit typing feature
+
+print "--- Basic Explicit Type Declarations ---";
+let v_int64: int64 = 9000000000000000000;
+print v_int64; // Expected: 9000000000000000000
+
+let v_int32: int32 = 12345;
+print v_int32; // Expected: 12345
+
+let v_float: float = 123.456;
+print v_float; // Expected: 123.46 (due to default float printing precision) or 123.456
+
+let v_bool_true: bool = true;
+print v_bool_true; // Expected: true
+
+let v_bool_false: bool = false;
+print v_bool_false; // Expected: false
+
+let v_string: string = "hello world";
+print v_string; // Expected: hello world
+
+// 'int' keyword as alias for int64
+let v_int_alias: int = 789;
+print v_int_alias; // Expected: 789 (should be int64)
+
+
+print "--- Type Conversions and Compatibility ---";
+// Integer literal to float variable
+let f_from_int_literal: float = 100;
+print f_from_int_literal; // Expected: 100.00 (or similar float representation)
+
+// int32 value to int64 variable (promotion)
+let i32_val: int32 = 77;
+let i64_from_i32: int64 = i32_val;
+print i64_from_i32; // Expected: 77
+
+// int64 value to int32 variable (valid narrowing)
+let i64_val_narrow_ok: int64 = 20000;
+let i32_from_i64_ok: int32 = i64_val_narrow_ok;
+print i32_from_i64_ok; // Expected: 20000
+
+// int64 value to int32 variable (overflow - should cause runtime error)
+print "--- Expected Overflow Error (int64 to int32) ---";
+let i64_val_overflow: int64 = 3000000000; // Exceeds int32 max
+// The following line should produce a runtime error:
+// let i32_overflow: int32 = i64_val_overflow;
+// print i32_overflow; // This line won't be reached if error occurs
+
+// Reset for next tests if interpreter continues after error (it shouldn't for this type of error)
+// For testing purposes, we'll assume interpreter halts on such errors.
+// Subsequent tests for type errors will be independent.
+
+
+print "--- Type Incompatibility Errors ---";
+
+// String to int64 (should cause runtime error)
+print "--- Expected Type Error (string to int64) ---";
+// let err_str_to_int: int64 = "not a number";
+// print err_str_to_int;
+
+// Float to int32 (should cause runtime error)
+print "--- Expected Type Error (float to int32) ---";
+// let err_float_to_int32: int32 = 123.45;
+// print err_float_to_int32;
+
+// Number to string (should cause runtime error without explicit conversion)
+print "--- Expected Type Error (int to string) ---";
+// let err_int_to_string: string = 12345;
+// print err_int_to_string;
+
+// Bool to int (should cause runtime error without explicit conversion)
+print "--- Expected Type Error (bool to int) ---";
+// let err_bool_to_int: int = true;
+// print err_bool_to_int;
+
+
+print "--- Using Explicitly Typed Variables in Expressions ---";
+let ex_a: int32 = 10;
+let ex_b: int64 = 20;
+let ex_c: float = 5.5;
+
+let res1 = ex_a + ex_b; // int32 + int64 -> int64
+print res1; // Expected: 30 (as int64)
+
+let res2 = ex_b * ex_c; // int64 * float -> float
+print res2; // Expected: 110.0 (or 110.00)
+
+let res3 = ex_a + ex_a; // int32 + int32 -> int32 (though result might be stored as int64 by print)
+print res3; // Expected: 20
+
+print "--- End of Explicit Typing Tests ---";
