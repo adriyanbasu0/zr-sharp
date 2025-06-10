@@ -1,0 +1,78 @@
+// Test cases for 64-bit integers and mixed type operations
+
+// Basic declaration and printing
+print "--- Basic Integer Operations ---";
+let i_a = 100;
+let i_b = 25;
+print i_a;       // Expected: 100
+print i_b;       // Expected: 25
+
+// Arithmetic
+print "--- Integer Arithmetic ---";
+let i_sum = i_a + i_b;
+print i_sum;     // Expected: 125
+let i_diff = i_a - i_b;
+print i_diff;    // Expected: 75
+let i_prod = i_a * i_b;
+print i_prod;    // Expected: 2500
+let i_quot = i_a / i_b;
+print i_quot;    // Expected: 4 (integer division)
+
+// let i_neg = -i_a;
+// print i_neg;     // Expected: -100 (Unary minus might not be implemented, check output)
+
+
+// Comparisons
+print "--- Integer Comparisons ---";
+print i_a > i_b;   // Expected: true
+print i_a < i_b;   // Expected: false
+print i_a == i_b;  // Expected: false
+print i_a != i_b;  // Expected: true
+print i_a >= i_b;  // Expected: true
+print i_a <= i_b;  // Expected: false
+print i_a == 100;  // Expected: true
+
+// Mixed type operations (Integer and Float)
+print "--- Mixed Type Operations (Int64 and Float) ---";
+let f_a = 10.5;
+let i_c = 2;
+
+let mixed_sum = f_a + i_c;    // Float + Int -> Float
+print mixed_sum;            // Expected: 12.5
+let mixed_diff = f_a - i_c;   // Float - Int -> Float
+print mixed_diff;           // Expected: 8.5
+let mixed_prod = f_a * i_c;   // Float * Int -> Float
+print mixed_prod;           // Expected: 21.0
+let mixed_quot = f_a / i_c;   // Float / Int -> Float
+print mixed_quot;           // Expected: 5.25
+
+let mixed_sum_rev = i_c + f_a; // Int + Float -> Float
+print mixed_sum_rev;         // Expected: 12.5
+
+// Mixed type comparisons
+print "--- Mixed Type Comparisons ---";
+print i_c > f_a;    // 2 > 10.5 -> false
+print i_c < f_a;    // 2 < 10.5 -> true
+print i_c == f_a;   // 2 == 10.5 -> false (after promotion)
+print 10 > 5.5;     // true
+print 5.5 < 10;     // true
+
+
+// Error handling (Division by zero)
+print "--- Error Handling ---";
+let i_zero = 0;
+// The following line should produce a runtime error message
+print i_a / i_zero; // Expected: Error: Division by zero
+
+let f_zero = 0.0;
+// The following line should produce a runtime error message
+print f_a / f_zero; // Expected: Error: Division by zero
+
+print "--- Large Number Test (should be int64) ---";
+let large_int = 9000000000000000000; // A large number that might exceed 32-bit int
+print large_int; // Expected: 9000000000000000000
+
+let large_int_op = large_int + 1;
+print large_int_op; // Expected: 9000000000000000001
+
+print "--- End of Integer Tests ---";

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 // Maximum number of statements in a program
 #define MAX_STATEMENTS 1000
@@ -41,6 +42,13 @@ typedef enum {
     TOKEN_RBRACE,
     TOKEN_SEMICOLON,
     TOKEN_COMMA,
+    TOKEN_COLON,
+    TOKEN_TYPE_INT,
+    TOKEN_TYPE_INT32,
+    TOKEN_TYPE_INT64,
+    TOKEN_TYPE_FLOAT,
+    TOKEN_TYPE_BOOL,
+    TOKEN_TYPE_STRING,
     TOKEN_LET,
     TOKEN_IF,
     TOKEN_ELSE,
@@ -62,6 +70,8 @@ typedef enum {
     TYPE_BOOL,
     TYPE_STRING,
     TYPE_VOID,
+    TYPE_INT32,
+    TYPE_INT64,
     TYPE_ERROR
 } DataType;
 
@@ -71,6 +81,8 @@ typedef union {
     double float_val;
     bool bool_val;
     char* string_val;
+    int32_t int32_val;
+    int64_t int64_val;
 } Value;
 
 // Variable structure
@@ -110,7 +122,8 @@ typedef enum {
 // AST node structure
 typedef struct ASTNode {
     NodeType type;
-    DataType data_type;
+    DataType data_type; // For inferred/evaluated type of the node itself
+    DataType explicit_type; // For explicitly declared type in 'let' statements
     Value value;
     struct ASTNode* left;
     struct ASTNode* right;

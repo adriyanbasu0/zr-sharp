@@ -36,7 +36,8 @@ static ASTNode* create_node(NodeType type) {
     node->param_count = 0;  // Added for completeness
     node->statements = NULL;
     node->statement_count = 0; // Renamed from statements_count for consistency with compiler.h
-    node->data_type = TYPE_VOID; // Default data type
+    node->data_type = TYPE_VOID; // Default data type for the node's own evaluated type
+    node->explicit_type = TYPE_VOID; // Default: no explicit type declaration
     
     return node;
 }
@@ -52,6 +53,14 @@ static ASTNode* parse_identifier(Parser* parser) {
     }
     node->value.string_val = parser->current_token.text; // Transfer ownership
     parser->current_token.text = NULL;                  // Nullify original pointer
+
+    // Inspect the string to determine if it's a float or int64
+    if (strchr(node->value.string_val, '.') != NULL) {
+        node->data_type = TYPE_FLOAT;
+    } else {
+        node->data_type = TYPE_INT64; // Default to INT64 for whole numbers
+    }
+
     advance_token(parser);
     return node;
 }
@@ -67,6 +76,14 @@ static ASTNode* parse_number(Parser* parser) {
     }
     node->value.string_val = parser->current_token.text; // Transfer ownership
     parser->current_token.text = NULL;                  // Nullify original pointer
+
+    // Inspect the string to determine if it's a float or int64
+    if (strchr(node->value.string_val, '.') != NULL) {
+        node->data_type = TYPE_FLOAT;
+    } else {
+        node->data_type = TYPE_INT64; // Default to INT64 for whole numbers
+    }
+
     advance_token(parser);
     return node;
 }
@@ -210,13 +227,49 @@ static ASTNode* parse_let_statement(Parser* parser) {
     if (!node) return NULL;
 
     // Assuming current_token.text is the correct field from lexer
-    node->value.string_val = strdup(parser->current_token.text); // Requirement 2 & 5 (direct assignment)
-    if (!node->value.string_val) { free_ast(node); return NULL; } // Check strdup success
+    node->value.string_val = strdup(parser->current_token.text);
+    if (!node->value.string_val) {
+        fprintf(stderr, "Parser Error: Failed to duplicate identifier name for 'let' statement.\n");
+        free_ast(node);
+        return NULL;
+    }
 
     advance_token(parser);  // consume identifier
-    
-    if (parser->current_token.type != TOKEN_EQ) { // Requirement 3 (TOKEN_ASSIGN -> TOKEN_EQ)
-        // error("Expected '=' after identifier in let statement");
+
+    // Check for explicit type declaration (e.g., let x : int64 = 10)
+    if (parser->current_token.type == TOKEN_COLON) {
+        advance_token(parser); // consume ':'
+
+        switch (parser->current_token.type) {
+            case TOKEN_TYPE_INT:
+                node->explicit_type = TYPE_INT64; // Default 'int' to TYPE_INT64
+                break;
+            case TOKEN_TYPE_INT32:
+                node->explicit_type = TYPE_INT32;
+                break;
+            case TOKEN_TYPE_INT64:
+                node->explicit_type = TYPE_INT64;
+                break;
+            case TOKEN_TYPE_FLOAT:
+                node->explicit_type = TYPE_FLOAT;
+                break;
+            case TOKEN_TYPE_BOOL:
+                node->explicit_type = TYPE_BOOL;
+                break;
+            case TOKEN_TYPE_STRING:
+                node->explicit_type = TYPE_STRING;
+                break;
+            default:
+                fprintf(stderr, "Parser Error: Expected type keyword (int, int32, int64, float, bool, string) after ':' in let statement, got %s.\n", parser->current_token.text);
+                free_ast(node); // Free the partially created node
+                return NULL;
+        }
+        advance_token(parser); // consume type keyword
+    }
+    // If no TOKEN_COLON, node->explicit_type remains TYPE_VOID (from create_node)
+
+    if (parser->current_token.type != TOKEN_EQ) {
+        fprintf(stderr, "Parser Error: Expected '=' after identifier or type in let statement, got %s.\n", parser->current_token.text);
         free_ast(node); // Free the partially created node
         return NULL;
     }
@@ -224,7 +277,7 @@ static ASTNode* parse_let_statement(Parser* parser) {
     
     ASTNode* value_expr = parse_expression(parser);
     if (value_expr == NULL) {
-        // error("Expected expression after '=' in let statement");
+        fprintf(stderr, "Parser Error: Expected expression after '=' in let statement.\n");
         free_ast(node); // Free the partially created node (name is in node->value.string_val)
         return NULL;
     }

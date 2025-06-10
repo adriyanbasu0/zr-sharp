@@ -20,7 +20,14 @@ static struct {
     {"and", TOKEN_AND},
     {"or", TOKEN_OR},
     {"not", TOKEN_NOT},
-    {NULL, TOKEN_EOF}
+    // Type keywords
+    {"int", TOKEN_TYPE_INT},
+    {"int32", TOKEN_TYPE_INT32},
+    {"int64", TOKEN_TYPE_INT64},
+    {"float", TOKEN_TYPE_FLOAT},
+    {"bool", TOKEN_TYPE_BOOL},
+    {"string", TOKEN_TYPE_STRING},
+    {NULL, TOKEN_EOF} // Keep NULL terminator at the end
 };
 
 // Initialize lexer
@@ -245,6 +252,11 @@ Token get_next_token(Lexer* lexer) {
         case ',': 
             token.type = TOKEN_COMMA; 
             token.text = strdup(","); 
+            lexer->position++; lexer->column++;
+            break;
+        case ':':
+            token.type = TOKEN_COLON;
+            token.text = strdup(":");
             lexer->position++; lexer->column++;
             break;
         case '=':
