@@ -348,9 +348,14 @@ void free_lexer(Lexer* lexer) {
 
 // Implementation of safe_malloc
 void* safe_malloc(size_t size) {
+    if (size == 0) {
+        fprintf(stderr, "Warning: Attempt to allocate zero bytes.\n");
+        size = 1; // Allocate at least 1 byte to avoid undefined behavior
+    }
     void* ptr = malloc(size);
     if (ptr == NULL) {
         fprintf(stderr, "Fatal: Memory allocation failed (size: %zu).\n", size);
+        perror("malloc");
         exit(EXIT_FAILURE);
     }
     return ptr;

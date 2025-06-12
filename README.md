@@ -26,7 +26,7 @@ ZR# is a modern programming language that combines the best features from Rust, 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/zr-sharp.git
+git clone https://github.com/adriyanbasu0/zr-sharp.git
 cd zr-sharp
 ```
 
@@ -79,16 +79,16 @@ if (sum > 10) {
 
 Compile and run:
 ```bash
-./z example.zr -o example
-./example
+./z example.zr
+// This cmd print out the output. We will add output files later   
 ```
 
 ## Language Syntax
 
 ### Variables
 ```zr
-let x = 10;      // Integer
-let y = 3.14;    // Float
+let x: int = 10;      // Integer
+let y: float = 3.14;    // Float
 let z = x + y;   // Type inference
 ```
 

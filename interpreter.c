@@ -564,13 +564,28 @@ static RuntimeValue evaluate_node(ASTNode* node) {
 }
 
 // Public interface
-void interpret(ASTNode* program_node) { // Renamed parameter for clarity
-    if (program_node != NULL) {
-        RuntimeValue final_result = evaluate_node(program_node);
-        // If the final result of the program is a string, it needs to be freed.
-        if (final_result.type == TYPE_STRING && final_result.val.string_val != NULL) {
-            safe_free(final_result.val.string_val); // Use safe_free
-        }
+void interpret(ASTNode* program_node) {
+    if (program_node == NULL) return;
+
+    RuntimeValue final_result = evaluate_node(program_node);
+
+    // Clean up any dynamically allocated memory in the result, if needed
+    switch (final_result.type) {
+        case TYPE_STRING:
+            if (final_result.val.string_val != NULL) {
+                safe_free(final_result.val.string_val);
+            }
+            break;
+        case TYPE_ERROR:
+        case TYPE_VOID:
+        case TYPE_INT:
+        case TYPE_INT32:
+        case TYPE_INT64:
+        case TYPE_FLOAT:
+        case TYPE_BOOL:
+        default:
+            // No dynamic memory to free for these types
+            break;
     }
 }
 
