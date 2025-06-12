@@ -2,6 +2,7 @@
 #include <stdarg.h> // For va_list, va_start, va_end
 #include <stdio.h>
 #include <stdlib.h>
+#include "debug.h" 
 
 // Function to report errors and exit
 void error(const char* format, ...) {
@@ -15,6 +16,7 @@ void error(const char* format, ...) {
 }
 
 int main(int argc, char* argv[]) {
+    set_debug_level(DEBUG_LEVEL_DEBUG); 
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <source_file>\n", argv[0]);
         return 1;

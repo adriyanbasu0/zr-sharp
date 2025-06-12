@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include "debug.h"
 
 // Keywords table
 static struct {
@@ -336,6 +337,8 @@ Token get_next_token(Lexer* lexer) {
             token.type = TOKEN_EOF; // Or some error token type
             token.text = NULL; // No text for invalid char
             lexer->position++; lexer->column++; // Consume the invalid char
+             LOG_DEBUG("Lexer encountered invalid character '%c' at line %d, column %d", 
+                      c, token.line, token.column);
     }
     
     return token;

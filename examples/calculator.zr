@@ -1,8 +1,8 @@
 // Simple calculator example
 
 // Numbers to operate on
-let x = 10;
-let y = 5;
+let x: int = 10;
+let y: int = 5;
 
 // Addition
 let sum = x + y;
