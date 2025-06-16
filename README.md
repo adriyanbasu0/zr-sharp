@@ -19,7 +19,6 @@ ZR# is a modern programming language that combines the best features from Rust, 
 ### Prerequisites
 
 - GCC compiler
-- Bash shell (for Unix-like systems)
 - Git (for cloning the repository)
 
 ### Steps
@@ -60,8 +59,8 @@ Create a file named `example.zr`:
 
 ```zr
 // Variable declaration
-let x = 10;
-let y = 5;
+let x: int = 10;
+let y: int = 5;
 
 // Arithmetic operations
 let sum = x + y;

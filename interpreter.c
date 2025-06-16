@@ -99,34 +99,51 @@ static Symbol* get_symbol(const char* name) {
 
 // Set a symbol in the symbol table
 static void set_symbol(const char* name, RuntimeValue rt_new_value) {
+    // Update existing symbol if found
     for (int i = 0; i < symbol_count; i++) {
         if (strcmp(symbol_table[i].name, name) == 0) {
-            // If old value was a string, free it
+            // Free old string value if needed
             if (symbol_table[i].type == TYPE_STRING && symbol_table[i].val.string_val != NULL) {
-                safe_free(symbol_table[i].val.string_val); // Use safe_free
+                safe_free(symbol_table[i].val.string_val);
             }
             symbol_table[i].type = rt_new_value.type;
-            symbol_table[i].val = rt_new_value.val;
+            // Deep copy string values to avoid double-free or dangling pointers
+            if (rt_new_value.type == TYPE_STRING && rt_new_value.val.string_val != NULL) {
+                symbol_table[i].val.string_val = strdup(rt_new_value.val.string_val);
+                if (symbol_table[i].val.string_val == NULL) {
+                    fprintf(stderr, "Error: Memory allocation failed for symbol value.\n");
+                }
+            } else {
+                symbol_table[i].val = rt_new_value.val;
+            }
             return;
         }
     }
-    
+
+    // Add new symbol if not found
     if (symbol_count < MAX_SYMBOLS) {
         symbol_table[symbol_count].name = strdup(name);
         if (symbol_table[symbol_count].name == NULL && name != NULL) {
-             fprintf(stderr, "Error: Memory allocation failed for symbol name.\n");
-             if (rt_new_value.type == TYPE_STRING && rt_new_value.val.string_val != NULL) {
-                 safe_free(rt_new_value.val.string_val); // Use safe_free
-             }
-             return;
+            fprintf(stderr, "Error: Memory allocation failed for symbol name.\n");
+            if (rt_new_value.type == TYPE_STRING && rt_new_value.val.string_val != NULL) {
+                safe_free(rt_new_value.val.string_val);
+            }
+            return;
         }
         symbol_table[symbol_count].type = rt_new_value.type;
-        symbol_table[symbol_count].val = rt_new_value.val;
+        if (rt_new_value.type == TYPE_STRING && rt_new_value.val.string_val != NULL) {
+            symbol_table[symbol_count].val.string_val = strdup(rt_new_value.val.string_val);
+            if (symbol_table[symbol_count].val.string_val == NULL) {
+                fprintf(stderr, "Error: Memory allocation failed for symbol value.\n");
+            }
+        } else {
+            symbol_table[symbol_count].val = rt_new_value.val;
+        }
         symbol_count++;
     } else {
         fprintf(stderr, "Error: Symbol table overflow.\n");
         if (rt_new_value.type == TYPE_STRING && rt_new_value.val.string_val != NULL) {
-            safe_free(rt_new_value.val.string_val); // Use safe_free
+            safe_free(rt_new_value.val.string_val);
         }
     }
 }
