@@ -1,0 +1,7 @@
+// This is the util.zr file for testing loadin
+loadin "./another.zr" // Test relative path loading
+
+let util_message: string = "Hello from util.zr!";
+print util_message;
+
+let util_version: int64 = 1;

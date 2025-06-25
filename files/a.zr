@@ -1,0 +1,4 @@
+// This is file a.zr for circular dependency test
+print "a.zr: Starting to load...";
+loadin "./b"; // Attempt to load sibling b.zr
+print "a.zr: Finished loading (should not be reached if circular).";

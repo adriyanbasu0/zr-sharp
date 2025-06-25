@@ -60,7 +60,9 @@ typedef enum {
     TOKEN_FALSE,
     TOKEN_AND,
     TOKEN_OR,
-    TOKEN_NOT
+    TOKEN_NOT,
+    TOKEN_LOADIN, // New token for 'loadin' keyword
+    TOKEN_DOT     // New token for '.' operator (for module attribute access)
 } TokenType;
 
 // Data types
@@ -116,7 +118,8 @@ typedef enum {
     NODE_PRINT,
     NODE_FUNC,
     NODE_CALL,
-    NODE_RETURN
+    NODE_RETURN,
+    NODE_LOADIN   // New AST node type for loadin "filepath"
 } NodeType;
 
 // AST node structure
@@ -171,10 +174,29 @@ Lexer* init_lexer(char* input);
 Token get_next_token(Lexer* lexer);
 void free_lexer(Lexer* lexer); // Added declaration
 Parser* init_parser(Lexer* lexer);
-ASTNode* parse_program(Parser* parser);
+ASTNode* parse_program(Parser* parser); // Might need context
 void free_parser(Parser* parser); // Added declaration
-void interpret(ASTNode* node);
+void interpret(ASTNode* node); // Will be refactored to interpret_statement
 void free_ast(ASTNode* node);
+
+// Module Loading Structures
+#define MAX_LOADED_MODULES 128
+#define MAX_MODULE_PATH_LEN 256 // Increased from typical MAX_IDENT_LEN
+
+typedef struct {
+    char paths[MAX_LOADED_MODULES][MAX_MODULE_PATH_LEN];
+    int count;
+} LoadedModulesRegistry;
+
+// Context for parsing, mainly to know the current file's path for relative loads
+typedef struct {
+    char current_file_path[MAX_MODULE_PATH_LEN];
+    // Potentially other context like main_script_dir could be here if not passed separately
+} ParseContext;
+
+// AST Node creation function (declaration for use in main.c)
+ASTNode* create_node(NodeType type);
+
 
 // Error handling
 void error(const char* format, ...);

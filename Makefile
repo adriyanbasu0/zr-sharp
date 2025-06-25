@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -I.
-SRCS = main.c lexer.c parser.c interpreter.c
+SRCS = main.c lexer.c parser.c interpreter.c debug.c
 OBJS = $(SRCS:.c=.o)
 TARGET = compiler
 
