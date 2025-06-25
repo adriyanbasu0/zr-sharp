@@ -1,2 +1,5 @@
 let v_int64: int64 = 9000000000000000000;
-print v_int64;
+let v_int32: int32 = 10000;
+if (v_int64 > v_int32 ) {
+    print "test heheheed";
+}

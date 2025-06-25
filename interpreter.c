@@ -609,14 +609,19 @@ void interpret(ASTNode* program_node) {
 // Function to free all memory allocated by the interpreter (symbol table)
 void free_interpreter_memory() {
     for (int i = 0; i < symbol_count; i++) {
-        if (symbol_table[i].name != NULL) {
-            safe_free(symbol_table[i].name); // Use safe_free
+        // Free symbol name
+        if (symbol_table[i].name) {
+            safe_free(symbol_table[i].name);
             symbol_table[i].name = NULL;
         }
-        if (symbol_table[i].type == TYPE_STRING && symbol_table[i].val.string_val != NULL) {
-            safe_free(symbol_table[i].val.string_val); // Use safe_free
+        // Free value if it's a string
+        if (symbol_table[i].type == TYPE_STRING && symbol_table[i].val.string_val) {
+            safe_free(symbol_table[i].val.string_val);
             symbol_table[i].val.string_val = NULL;
         }
+        // Optionally, clear the rest of the symbol struct for safety
+        symbol_table[i].type = TYPE_VOID;
+        memset(&symbol_table[i].val, 0, sizeof(symbol_table[i].val));
     }
-    symbol_count = 0; // Reset symbol count
+    symbol_count = 0;
 }
