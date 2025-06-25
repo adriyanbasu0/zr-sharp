@@ -1,4 +1,5 @@
 #include "compiler.h"
+#include "debug.h" // Added for LOG_DEBUG
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -556,33 +557,58 @@ static RuntimeValue evaluate_node(ASTNode* node) {
         case NODE_BLOCK: { // Changed from NODE_PROGRAM
             RuntimeValue last_rt_val_in_block = create_error_runtime_value();
             bool first_stmt_in_block = true;
+            // Ensure node->statements is not NULL before accessing, though parser should initialize it.
+            if (node->statements == NULL && node->statement_count > 0) {
+                 fprintf(stderr, "Internal Error: NODE_BLOCK has statements but statements array is NULL.\n");
+                 return create_error_runtime_value();
+            }
             for (int i = 0; i < node->statement_count; i++) {
                 if (node->statements[i] != NULL) {
                     // Free previous statement's string result if it was one and not the one we are about to return
+                    // This logic is complex and might be better handled by ensuring each operation cleans up its own temporary results.
+                    // For now, this specific cleanup is commented out as it might lead to double frees if not perfectly managed.
+                    /*
                     if (!first_stmt_in_block && last_rt_val_in_block.type == TYPE_STRING && last_rt_val_in_block.val.string_val != NULL) {
                         // This logic is tricky: only free if it's an intermediate string result
                         // For now, assume strings are handled/freed by who creates them (e.g. print)
                     }
+                    */
                     last_rt_val_in_block = evaluate_node(node->statements[i]);
                     if (last_rt_val_in_block.type == TYPE_ERROR) return last_rt_val_in_block;
                 }
                 first_stmt_in_block = false;
             }
-            if (first_stmt_in_block) { // Empty block
+            if (first_stmt_in_block && node->statement_count == 0) { // Empty block
                  RuntimeValue empty_block_val; empty_block_val.type = TYPE_VOID; return empty_block_val;
             }
+            // If the block was not empty but all statements were NULL (should not happen with current parser)
+            // or if last_rt_val_in_block was not updated (e.g. only NULL statements), it will return the initialized create_error_runtime_value().
+            // This might be okay, or might need a specific TYPE_VOID if all statements were valid but non-returning.
             return last_rt_val_in_block;
         }
+
+        case NODE_LOADIN: // NODE_LOADIN should be handled by process_source_code, not evaluated directly.
+            fprintf(stderr, "Internal Error: NODE_LOADIN encountered in evaluate_node. This should have been processed earlier.\n");
+            return create_error_runtime_value();
             
-        default:
-            fprintf(stderr, "Error: Unknown AST node type %d\n", node->type);
+        default: // This is the single default case now
+            fprintf(stderr, "Error: Unknown AST node type %d in evaluate_node.\n", node->type);
             return create_error_runtime_value();
     }
 }
 
 // Public interface
 void interpret(ASTNode* program_node) {
-    if (program_node == NULL) return;
+    // program_node is typically a NODE_BLOCK containing statements for the current module/file.
+    if (program_node == NULL) {
+        LOG_DEBUG("interpret called with NULL program_node.");
+        return;
+    }
+    if (program_node->type != NODE_BLOCK && program_node->statement_count == 0 && program_node->type != NODE_PRINT /* and other single valid statements */) {
+        // Allow interpret to be called with single statements if needed, though current plan has it called with a block.
+        // For now, let's assume it's mostly blocks.
+        LOG_DEBUG("Interpreting a non-block node or empty block directly. Node type: %d", program_node->type);
+    }
 
     RuntimeValue final_result = evaluate_node(program_node);
 

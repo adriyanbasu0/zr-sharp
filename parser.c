@@ -15,8 +15,8 @@ Parser* init_parser(Lexer* lexer) {
     return parser;
 }
 
-// Create a new AST node
-static ASTNode* create_node(NodeType type) {
+// Create a new AST node (no longer static)
+ASTNode* create_node(NodeType type) {
     ASTNode* node = (ASTNode*)safe_malloc(sizeof(ASTNode)); // Use safe_malloc
     // safe_malloc handles exit on failure, so no NULL check needed here for node itself
     
@@ -90,8 +90,9 @@ static ASTNode* parse_number(Parser* parser) {
 
 // Forward declarations
 static ASTNode* parse_expression(Parser* parser);
-static ASTNode* parse_statement(Parser* parser);
+static ASTNode* parse_statement(Parser* parser); // Will call parse_loadin_statement
 static ASTNode* parse_block(Parser* parser);
+static ASTNode* parse_loadin_statement(Parser* parser); // New forward declaration
 
 // parse_binary_operation is removed as it's unused. 
 // Logic is handled in parse_expression.
@@ -375,6 +376,48 @@ static ASTNode* parse_if_statement(Parser* parser) {
     return node;
 }
 
+// Parse a loadin statement (e.g., loadin "module_name")
+static ASTNode* parse_loadin_statement(Parser* parser) {
+    advance_token(parser); // Consume 'loadin' keyword
+
+    if (parser->current_token.type != TOKEN_STRING) {
+        error("Parser Error: Expected string literal (file path) after 'loadin', got %s at line %d, column %d.",
+              parser->current_token.text ? parser->current_token.text : "unknown token",
+              parser->current_token.line, parser->current_token.column);
+        return NULL;
+    }
+
+    ASTNode* node = create_node(NODE_LOADIN);
+    if (!node) return NULL; // Should not happen with safe_malloc
+
+    if (parser->current_token.text == NULL) {
+        error("Parser Error: String token for 'loadin' path has NULL text at line %d, column %d.",
+              parser->current_token.line, parser->current_token.column);
+        free_ast(node); // free_ast can handle node if value.string_val is NULL
+        return NULL;
+    }
+
+    node->value.string_val = strdup(parser->current_token.text); // Duplicate the path string
+    if (!node->value.string_val) {
+        error("Parser Error: Failed to duplicate path string for 'loadin' at line %d, column %d.",
+              parser->current_token.line, parser->current_token.column);
+        // No need to free parser->current_token.text, lexer owns it until transferred or node is fully formed
+        free_ast(node); // Free the node itself
+        return NULL;
+    }
+    // Original token text from lexer is not freed here; it will be freed when the token itself is
+    // effectively discarded or its text pointer nullified after transfer.
+    // Since we strdup'd, the original token's text is untouched by this AST node.
+
+    advance_token(parser); // Consume the string literal token
+
+    // loadin statements are typically followed by a semicolon or newline in many languages.
+    // For now, we don't enforce a semicolon strictly after loadin,
+    // it will be handled by the general semicolon consumption in parse_statement if present.
+    return node;
+}
+
+
 // Parse a statement
 static ASTNode* parse_statement(Parser* parser) {
     ASTNode* statement = NULL;
@@ -388,6 +431,9 @@ static ASTNode* parse_statement(Parser* parser) {
             break;
         case TOKEN_PRINT: // Stays TOKEN_PRINT
             statement = parse_print_statement(parser);
+            break;
+        case TOKEN_LOADIN: // Added case for TOKEN_LOADIN
+            statement = parse_loadin_statement(parser);
             break;
         // Add other statement types: TOKEN_WHILE, TOKEN_FUNC, TOKEN_RETURN etc.
         default:

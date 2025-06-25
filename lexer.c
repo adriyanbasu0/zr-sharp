@@ -28,6 +28,7 @@ static struct {
     {"float", TOKEN_TYPE_FLOAT},
     {"bool", TOKEN_TYPE_BOOL},
     {"string", TOKEN_TYPE_STRING},
+    {"loadin", TOKEN_LOADIN}, // Added 'loadin' keyword
     {NULL, TOKEN_EOF} // Keep NULL terminator at the end
 };
 
@@ -258,6 +259,11 @@ Token get_next_token(Lexer* lexer) {
         case ':':
             token.type = TOKEN_COLON;
             token.text = strdup(":");
+            lexer->position++; lexer->column++;
+            break;
+        case '.': // Added case for TOKEN_DOT
+            token.type = TOKEN_DOT;
+            token.text = strdup(".");
             lexer->position++; lexer->column++;
             break;
         case '=':
